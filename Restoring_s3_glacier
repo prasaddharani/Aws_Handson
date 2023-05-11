@@ -1,0 +1,48 @@
+import boto3
+import concurrent.futures
+
+def restore_object(bucket_name, key):
+    s3 = boto3.client('s3')
+
+    # Initiate a restore request for the object
+    s3.restore_object(Bucket=bucket_name, Key=key)
+
+    return key
+
+def restore_glacier_objects(bucket_name, prefix):
+    s3 = boto3.client('s3')
+
+    # List objects in the bucket with the specified prefix
+    response = s3.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
+
+    restore_tasks = []
+
+    if 'Contents' in response:
+        for obj in response['Contents']:
+            key = obj['Key']
+            storage_class = obj['StorageClass']
+
+            if storage_class == 'GLACIER':
+                # Create a restore task for the object
+                task = concurrent.futures.ThreadPoolExecutor().submit(restore_object, bucket_name, key)
+                restore_tasks.append(task)
+            else:
+                print(f"Skipping object: {key} (already in Standard storage class)")
+    else:
+        print("No objects found in the bucket.")
+
+    # Wait for all restore tasks to complete
+    concurrent.futures.wait(restore_tasks)
+
+    # Process results
+    for task in restore_tasks:
+        key = task.result()
+        print(f"Restore completed for object: {key}")
+
+# Replace 'your_bucket_name' with the actual name of your S3 bucket
+bucket_name = 'your_bucket_name'
+
+# Replace 'your_prefix' with the desired prefix or specify an empty string ('') for the entire bucket
+prefix = 'your_prefix'
+
+restore_glacier_objects(bucket_name, prefix)
