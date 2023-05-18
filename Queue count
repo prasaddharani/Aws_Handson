@@ -1,0 +1,43 @@
+import boto3
+
+# Create a Boto3 client for Amazon SQS
+sqs_client = boto3.client('sqs')
+
+# Get the list of queues
+response = sqs_client.list_queues()
+
+if 'QueueUrls' in response:
+    queue_urls = response['QueueUrls']
+    
+    dead_letter_queues = []
+    standard_queues = []
+    fifo_queues = []
+    
+    for queue_url in queue_urls:
+        queue_attributes = sqs_client.get_queue_attributes(
+            QueueUrl=queue_url,
+            AttributeNames=['QueueArn']
+        )
+        
+        queue_arn = queue_attributes['Attributes']['QueueArn']
+        
+        if queue_arn.endswith('.fifo'):
+            fifo_queues.append(queue_url)
+        elif queue_arn.endswith('_redrive.fifo'):
+            dead_letter_queues.append(queue_url)
+        else:
+            standard_queues.append(queue_url)
+    
+    print("Dead Letter Queues:")
+    for queue in dead_letter_queues:
+        print(queue)
+    
+    print("\nStandard Queues:")
+    for queue in standard_queues:
+        print(queue)
+    
+    print("\nFIFO Queues:")
+    for queue in fifo_queues:
+        print(queue)
+else:
+    print("No queues found.")
